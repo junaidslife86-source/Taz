@@ -23,6 +23,7 @@ import type {
 } from "../../types/finance";
 import { RememberRulePrompt } from "../../components/RememberRulePrompt";
 import { findDuplicates } from "../../lib/calculations";
+import { ImportLimitError } from "../../lib/security-limits";
 import type { ColumnMapping, DraftTransaction, Transaction } from "../../types/finance";
 import { PDF_IMPORT_WARNING } from "../../types/finance";
 import { formatCurrency } from "../../lib/formatters";
@@ -118,7 +119,11 @@ export function ImportPage() {
       setMapping(guessed);
       setStep("map");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to parse file");
+      const msg =
+        e instanceof ImportLimitError || e instanceof Error
+          ? e.message
+          : "Failed to parse file";
+      setError(msg);
     }
   };
 

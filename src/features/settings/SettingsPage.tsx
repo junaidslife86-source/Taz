@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "../../components/Header";
+import { AiAssistConsentModal } from "../../components/AiAssistConsentModal";
 import { useFinanceStore, createUserRule } from "../../lib/storage";
 import {
   APP_VERSION,
@@ -23,8 +24,11 @@ export function SettingsPage() {
     categories,
     categoryRules,
     settings,
-    exportBackup,
-    importBackup,
+    exportEncryptedBackup,
+    exportStrippedDiagnosticBackup,
+    exportStatementTemplateBackup,
+    importBackupFile,
+    peekBackupFileKind,
     clearData,
     setOnboardingComplete,
     deleteCategory,
@@ -45,33 +49,121 @@ export function SettingsPage() {
   const [ruleCategory, setRuleCategory] = useState("Groceries");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [includeApiKeyInBackup, setIncludeApiKeyInBackup] = useState(false);
+  const [showAiConsent, setShowAiConsent] = useState(false);
+  const [showEncryptedExport, setShowEncryptedExport] = useState(false);
+  const [exportPassword, setExportPassword] = useState("");
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState("");
+  const [importPassword, setImportPassword] = useState("");
+  const [pendingEncryptedImport, setPendingEncryptedImport] = useState<File | null>(
+    null,
+  );
 
   const userRules = categoryRules.filter((r) => !r.isDefault);
   const defaultRules = categoryRules.filter((r) => r.isDefault);
 
-  const handleExport = () => {
-    const backup = exportBackup();
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+  const downloadJson = (data: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `myfinancepal-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setMessage({ type: "success", text: "Backup downloaded successfully." });
   };
 
-  const handleImport = async (file: File) => {
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      await importBackup(data);
-      setMessage({ type: "success", text: "Backup restored successfully." });
-    } catch {
-      setMessage({ type: "error", text: "Invalid backup file. Please check the file and try again." });
+  const dateStamp = () => new Date().toISOString().slice(0, 10);
+
+  const handleEncryptedExport = async () => {
+    if (exportPassword.length < 8) {
+      setMessage({
+        type: "error",
+        text: "Backup password must be at least 8 characters.",
+      });
+      return;
     }
+    if (exportPassword !== exportPasswordConfirm) {
+      setMessage({ type: "error", text: "Passwords do not match." });
+      return;
+    }
+    try {
+      const backup = await exportEncryptedBackup(exportPassword, {
+        includeGeminiApiKey: includeApiKeyInBackup,
+      });
+      downloadJson(
+        backup,
+        `myfinancepal-encrypted-backup-${dateStamp()}.json`,
+      );
+      setShowEncryptedExport(false);
+      setExportPassword("");
+      setExportPasswordConfirm("");
+      setMessage({
+        type: "success",
+        text: includeApiKeyInBackup
+          ? "Encrypted backup downloaded (includes API key — store securely)."
+          : "Encrypted backup downloaded (API key excluded by default).",
+      });
+    } catch (e) {
+      setMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Could not create encrypted backup.",
+      });
+    }
+  };
+
+  const handleStrippedExport = () => {
+    const backup = exportStrippedDiagnosticBackup();
+    downloadJson(backup, `myfinancepal-diagnostic-${dateStamp()}.json`);
+    setMessage({
+      type: "success",
+      text: "Stripped diagnostic backup downloaded (not restorable).",
+    });
+  };
+
+  const handleTemplateExport = () => {
+    const backup = exportStatementTemplateBackup();
+    downloadJson(backup, `myfinancepal-templates-${dateStamp()}.json`);
+    setMessage({
+      type: "success",
+      text: "Statement template export downloaded (not restorable).",
+    });
+  };
+
+  const handleImport = async (file: File, password?: string) => {
+    try {
+      const kind = await peekBackupFileKind(file);
+      if (kind === "non_restorable") {
+        setMessage({
+          type: "error",
+          text: "This file is a diagnostic or template export and cannot be restored.",
+        });
+        return;
+      }
+      if (kind === "encrypted" && !password?.trim()) {
+        setPendingEncryptedImport(file);
+        return;
+      }
+      await importBackupFile(file, password);
+      setPendingEncryptedImport(null);
+      setImportPassword("");
+      setGeminiKeyInput("");
+      setMessage({
+        type: "success",
+        text: "Backup restored. AI Assist is off — re-enter your API key if needed.",
+      });
+    } catch (e) {
+      setMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Invalid backup file.",
+      });
+    }
+  };
+
+  const handleEncryptedImportConfirm = async () => {
+    if (!pendingEncryptedImport) return;
+    await handleImport(pendingEncryptedImport, importPassword);
   };
 
   const handleClear = async () => {
@@ -102,20 +194,29 @@ export function SettingsPage() {
     setMessage({ type: "success", text: "API key saved locally in this browser." });
   };
 
-  const handleToggleAiAssist = async (enabled: boolean) => {
-    if (enabled && !geminiKeyInput.trim() && !settings.geminiApiKey.trim()) {
+  const handleToggleAiAssist = (enabled: boolean) => {
+    if (!enabled) {
+      void updateAppSettings({ aiAssistEnabled: false }).then(() =>
+        setMessage({ type: "success", text: "AI Assist disabled — local rules only." }),
+      );
+      return;
+    }
+    if (!geminiKeyInput.trim() && !settings.geminiApiKey.trim()) {
       setMessage({
         type: "error",
         text: "Add and save a Gemini API key before enabling AI Assist.",
       });
       return;
     }
-    await updateAppSettings({ aiAssistEnabled: enabled });
+    setShowAiConsent(true);
+  };
+
+  const confirmAiAssist = async () => {
+    await updateAppSettings({ aiAssistEnabled: true });
+    setShowAiConsent(false);
     setMessage({
       type: "success",
-      text: enabled
-        ? "AI Assist enabled — uncategorised transactions may use Gemini."
-        : "AI Assist disabled — local rules only.",
+      text: "AI Assist enabled — not private/offline mode.",
     });
   };
 
@@ -263,9 +364,18 @@ export function SettingsPage() {
         )}
       </section>
 
+      <AiAssistConsentModal
+        open={showAiConsent}
+        onConfirm={() => void confirmAiAssist()}
+        onCancel={() => setShowAiConsent(false)}
+      />
+
       <section className="card">
-        <h2>AI Assist (optional)</h2>
+        <h2>AI Assist (optional — not offline/private)</h2>
         <p className="help-text">{AI_ASSIST_PRIVACY_WARNING}</p>
+        <p className="alert alert-warning">
+          AI Assist is <strong>not</strong> private mode. Transaction data may leave your device for Google Gemini.
+        </p>
 
         <ol className="ai-assist-steps">
           <li>
@@ -297,7 +407,7 @@ export function SettingsPage() {
             checked={settings.aiAssistEnabled}
             onChange={(e) => handleToggleAiAssist(e.target.checked)}
           />
-          <span>Enable AI Assist for categorisation</span>
+          <span>Enable AI Assist (sends redacted data to Google)</span>
         </label>
 
         <label className="form-field form-field--full">
@@ -329,32 +439,192 @@ export function SettingsPage() {
       <section className="card">
         <h2>Backup &amp; restore</h2>
         <p className="help-text">
-          Export all your data as a JSON file. Store it somewhere safe — your data lives only in this browser.
+          Choose an export that matches how you will use the file. Only{" "}
+          <strong>full encrypted backups</strong> can restore your data.
         </p>
-        <div className="form-actions">
-          <button type="button" className="btn btn-primary" onClick={handleExport}>
-            Export backup
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => fileRef.current?.click()}
-          >
-            Import backup
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json"
-            className="file-uploader-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleImport(file);
-              e.target.value = "";
-            }}
-          />
+
+        <div className="backup-option">
+          <h3>Full encrypted backup</h3>
+          <p className="backup-option-label">For personal restore</p>
+          <p className="help-text">
+            Exports all data, encrypted with AES-GCM (key derived from your password via
+            PBKDF2). Gemini API key is excluded unless you opt in below.
+          </p>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={includeApiKeyInBackup}
+              onChange={(e) => setIncludeApiKeyInBackup(e.target.checked)}
+            />
+            <span>Include Gemini API key — not recommended</span>
+          </label>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowEncryptedExport(true)}
+            >
+              Export encrypted backup
+            </button>
+          </div>
+        </div>
+
+        <div className="backup-option">
+          <h3>Stripped diagnostic backup</h3>
+          <p className="backup-option-label">For support / debugging</p>
+          <p className="help-text">
+            Removes names, addresses, account numbers, notes, API keys, and merchant
+            text. Merchants become stable pseudonyms (e.g. MERCHANT_001). Keeps dates,
+            amounts, categories, types, and reconciliation totals.
+          </p>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleStrippedExport}
+            >
+              Export diagnostic backup
+            </button>
+          </div>
+        </div>
+
+        <div className="backup-option">
+          <h3>Statement template export</h3>
+          <p className="backup-option-label">For community parser sharing</p>
+          <p className="help-text">
+            Parser detection rules, column mapping hints, date formats, reconciliation
+            formulas, and edge cases only — no transactions or statement text.
+          </p>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleTemplateExport}
+            >
+              Export templates
+            </button>
+          </div>
+        </div>
+
+        <div className="backup-option backup-option--restore">
+          <h3>Restore</h3>
+          <p className="help-text">
+            Import a full encrypted backup (or legacy unencrypted JSON). Diagnostic and
+            template exports cannot be restored.
+          </p>
+          {pendingEncryptedImport ? (
+            <div className="backup-import-password">
+              <p className="help-text">
+                Encrypted backup selected:{" "}
+                <strong>{pendingEncryptedImport.name}</strong>
+              </p>
+              <label className="form-field form-field--full">
+                <span>Backup password</span>
+                <input
+                  type="password"
+                  value={importPassword}
+                  onChange={(e) => setImportPassword(e.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void handleEncryptedImportConfirm()}
+                >
+                  Decrypt and restore
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setPendingEncryptedImport(null);
+                    setImportPassword("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileRef.current?.click()}
+              >
+                Import backup
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".json"
+                className="file-uploader-input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleImport(file);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          )}
         </div>
       </section>
+
+      {showEncryptedExport ? (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="encrypted-backup-title"
+        >
+          <div className="modal-card">
+            <h2 id="encrypted-backup-title">Encrypt backup</h2>
+            <p className="help-text">
+              Choose a strong password. You will need it to restore this file.
+            </p>
+            <label className="form-field form-field--full">
+              <span>Backup password</span>
+              <input
+                type="password"
+                value={exportPassword}
+                onChange={(e) => setExportPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="form-field form-field--full">
+              <span>Confirm password</span>
+              <input
+                type="password"
+                value={exportPasswordConfirm}
+                onChange={(e) => setExportPasswordConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
+            </label>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void handleEncryptedExport()}
+              >
+                Download encrypted backup
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowEncryptedExport(false);
+                  setExportPassword("");
+                  setExportPasswordConfirm("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="card">
         <h2>Categories</h2>

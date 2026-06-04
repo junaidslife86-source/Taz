@@ -9,6 +9,11 @@ import type {
   ReconciliationResult,
   StatementSummary,
 } from "./statement-formats/reconciliation";
+import {
+  assertFileSize,
+  assertPdfPageCount,
+  assertTextLength,
+} from "./security-limits";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -95,29 +100,55 @@ export async function parsePdf(
   file: File,
   options?: ParsePdfOptions,
 ): Promise<PdfParseResult> {
-  const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  assertFileSize(file);
+
+  let pdf;
+  try {
+    const buffer = await file.arrayBuffer();
+    pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  } catch {
+    throw new Error(
+      "Could not read this PDF. The file may be corrupted, password-protected, or unsupported.",
+    );
+  }
+
+  assertPdfPageCount(pdf.numPages);
 
   const allLines: string[] = [];
+  let textLength = 0;
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageLines = linesFromTextContent(
-      content.items as Array<{ str?: string; transform?: number[] }>,
-    );
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageLines = linesFromTextContent(
+        content.items as Array<{ str?: string; transform?: number[] }>,
+      );
 
-    if (pageLines.length > 0) {
-      allLines.push(...pageLines);
-    } else {
-      const fallback = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ");
-      if (fallback.trim()) allLines.push(fallback.trim());
+      if (pageLines.length > 0) {
+        for (const line of pageLines) {
+          textLength += line.length;
+          assertTextLength(textLength);
+          allLines.push(line);
+        }
+      } else {
+        const fallback = content.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .join(" ");
+        if (fallback.trim()) {
+          textLength += fallback.length;
+          assertTextLength(textLength);
+          allLines.push(fallback.trim());
+        }
+      }
     }
+  } catch (e) {
+    if (e instanceof Error && e.name === "ImportLimitError") throw e;
+    throw new Error("Failed to extract text from this PDF. Try exporting a CSV from your bank.");
   }
 
   const rawText = allLines.join("\n");
+  assertTextLength(rawText.length);
   const initial = parseStatementText(rawText, file.name);
 
   const match =

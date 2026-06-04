@@ -9,7 +9,7 @@ export function FileUploader({
   accept = ".csv,.xlsx,.xls,.pdf",
   onFileSelect,
   label = "Choose a file",
-  hint = "CSV, XLSX, or PDF bank statements",
+  hint = "CSV, XLSX, or PDF — max 10 MB per file",
 }: FileUploaderProps) {
   return (
     <label className="file-uploader">

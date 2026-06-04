@@ -878,6 +878,72 @@ button, input, select, textarea {
   color: var(--color-primary);
 }
 
+.ai-assist-consent-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.ai-assist-consent-list li {
+  margin-bottom: 0.35rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.modal-card h2 {
+  margin: 0 0 1rem;
+}
+
+.backup-option {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.backup-option h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.backup-option-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+}
+
+.backup-option--restore {
+  margin-top: 1.5rem;
+}
+
+.backup-import-password {
+  margin-top: 0.75rem;
+}
+
 .page-loader {
   display: flex;
   align-items: center;

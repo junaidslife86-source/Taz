@@ -1,5 +1,6 @@
 import { parseISO, isValid, format } from "date-fns";
 import type { ColumnMapping, Transaction } from "../types/finance";
+import { assertFileSize, ImportLimitError } from "./security-limits";
 
 export type ParsedRow = Record<string, string | number | null>;
 
@@ -10,14 +11,24 @@ export type ParseResult = {
 };
 
 export async function parseFile(file: File): Promise<ParseResult> {
+  assertFileSize(file);
   const ext = file.name.split(".").pop()?.toLowerCase();
-  if (ext === "csv") {
-    const { parseCsv } = await import("./parsers-csv");
-    return parseCsv(file);
-  }
-  if (ext === "xlsx" || ext === "xls") {
-    const { parseXlsx } = await import("./parsers-xlsx");
-    return parseXlsx(file);
+  try {
+    if (ext === "csv") {
+      const { parseCsv } = await import("./parsers-csv");
+      return await parseCsv(file);
+    }
+    if (ext === "xlsx" || ext === "xls") {
+      const { parseXlsx } = await import("./parsers-xlsx");
+      return await parseXlsx(file);
+    }
+  } catch (e) {
+    if (e instanceof ImportLimitError) throw e;
+    throw new Error(
+      e instanceof Error
+        ? e.message
+        : "Could not parse this file. Check the format and try again.",
+    );
   }
   throw new Error("Unsupported file type. Please upload a CSV, XLSX, or PDF file.");
 }

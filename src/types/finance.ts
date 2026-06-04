@@ -205,7 +205,10 @@ export const PDF_IMPORT_WARNING =
   "MyFinancePal can try to read PDF statements, but PDF formats vary by bank. Please review imported transactions before saving.";
 
 export const AI_ASSIST_PRIVACY_WARNING =
-  "AI Assist is optional. When enabled, transaction descriptions (and amount/date) are sent to Google Gemini using your own API key. Nothing is sent unless you turn this on and save a key. The app works fully without AI Assist.";
+  "AI Assist is optional. When enabled, redacted transaction details are sent to Google Gemini using your own API key. Nothing is sent unless you turn this on and save a key. The app works fully without AI Assist.";
+
+export const AI_ASSIST_CONSENT_TEXT =
+  "AI Assist is not private or offline. Enabling it allows your browser to send transaction date, redacted description, and amount to Google Gemini when local rules cannot categorise a transaction.";
 
 export const PRIVACY_STATEMENT =
   "MyFinancePal stores your financial data locally in your browser. Your data is not uploaded or shared unless you explicitly enable optional AI Assist with your own Gemini API key.";

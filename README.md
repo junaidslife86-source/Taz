@@ -130,6 +130,15 @@ MyFinancePal/
 
 ---
 
+## Security
+
+- Backups **exclude** Gemini API keys by default (opt-in to include).
+- Backup restore uses strict schema validation; API keys are never restored from backups.
+- Import limits: 10 MB files, 50 PDF pages, 20k rows.
+- See [SECURITY.md](SECURITY.md) for responsible disclosure.
+
+Run `npm test` and `npm audit` before deploying.
+
 ## Limitations
 
 MyFinancePal is a personal finance tracking tool, not financial advice. PDF import quality varies by bank. Stock/ETF values are manual. Data lives in your browser profile unless you export a backup.

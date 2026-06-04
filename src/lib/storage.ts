@@ -20,13 +20,23 @@ import type {
 } from "../types/finance";
 import { createStatementProfile } from "./statement-profiles";
 import {
-  APP_VERSION,
   FALLBACK_CATEGORY,
   isFallbackCategory,
   type CategoryUpdate,
 } from "../types/finance";
 import { defaultEmojiForName, normalizeEmoji } from "./category-display";
-import { backupSchema } from "./validation";
+import { isEncryptedBackupEnvelope } from "./backup-crypto";
+import { isNonRestorableExportKind } from "./backup-exports";
+import {
+  createBackupExport,
+  createEncryptedFullBackup,
+  createStrippedDiagnosticBackup,
+  createStatementTemplateBackup,
+  parseBackupForImport,
+  readAndValidateBackupFile,
+  readBackupJsonFile,
+  type BackupExportOptions,
+} from "./backup";
 import {
   categoriseTransactions,
   createRememberedRule,
@@ -83,8 +93,22 @@ type FinanceState = {
   deleteSnapshot: (id: string) => Promise<void>;
   setOnboardingComplete: (complete: boolean) => Promise<void>;
   updateAppSettings: (partial: Partial<AppSettings>) => Promise<void>;
-  exportBackup: () => BackupFile;
+  exportBackup: (options?: BackupExportOptions) => BackupFile;
+  exportEncryptedBackup: (
+    password: string,
+    options?: BackupExportOptions,
+  ) => Promise<Awaited<ReturnType<typeof createEncryptedFullBackup>>>;
+  exportStrippedDiagnosticBackup: () => ReturnType<
+    typeof createStrippedDiagnosticBackup
+  >;
+  exportStatementTemplateBackup: () => ReturnType<
+    typeof createStatementTemplateBackup
+  >;
   importBackup: (data: unknown) => Promise<void>;
+  importBackupFile: (file: File, password?: string) => Promise<void>;
+  peekBackupFileKind: (
+    file: File,
+  ) => Promise<"encrypted" | "plain" | "non_restorable">;
   clearData: () => Promise<void>;
 };
 
@@ -389,25 +413,17 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     set({ settings });
   },
 
-  exportBackup: () => {
-    const state = get();
-    return {
-      appName: "MyFinancePal" as const,
-      version: APP_VERSION,
-      exportedAt: new Date().toISOString(),
-      transactions: state.transactions,
-      assets: state.assets,
-      liabilities: state.liabilities,
-      categories: state.categories,
-      categoryRules: state.categoryRules,
-      statementProfiles: state.statementProfiles,
-      netWorthSnapshots: state.netWorthSnapshots,
-      settings: state.settings,
-    };
-  },
+  exportBackup: (options) => createBackupExport(get(), options),
+
+  exportEncryptedBackup: (password, options) =>
+    createEncryptedFullBackup(get(), password, options),
+
+  exportStrippedDiagnosticBackup: () => createStrippedDiagnosticBackup(get()),
+
+  exportStatementTemplateBackup: () => createStatementTemplateBackup(get()),
 
   importBackup: async (data) => {
-    const parsed = backupSchema.parse(data);
+    const parsed = parseBackupForImport(data);
     await Promise.all([
       db.transactions.clear(),
       db.assets.clear(),
@@ -426,14 +442,21 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       db.statementProfiles.bulkPut(parsed.statementProfiles ?? []),
       db.netWorthSnapshots.bulkPut(parsed.netWorthSnapshots),
     ]);
-    await updateSettings({
-      onboardingComplete: parsed.settings.onboardingComplete ?? false,
-      defaultCurrency: parsed.settings.defaultCurrency ?? "AUD",
-      aiAssistEnabled: parsed.settings.aiAssistEnabled ?? false,
-      geminiApiKey: parsed.settings.geminiApiKey ?? "",
-    });
+    await updateSettings(parsed.settings);
     await initializeDatabase();
     await get().loadAll();
+  },
+
+  importBackupFile: async (file, password) => {
+    const data = await readAndValidateBackupFile(file, password);
+    await get().importBackup(data);
+  },
+
+  peekBackupFileKind: async (file) => {
+    const data = await readBackupJsonFile(file);
+    if (isEncryptedBackupEnvelope(data)) return "encrypted";
+    if (isNonRestorableExportKind(data)) return "non_restorable";
+    return "plain";
   },
 
   clearData: async () => {

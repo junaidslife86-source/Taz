@@ -1,5 +1,6 @@
 import type { CategorisationResult } from "../types/finance";
 import type { CategorisationInput } from "./categorisation";
+import { redactForAiAssist } from "./security-limits";
 import { FALLBACK_CATEGORY, SEED_CATEGORIES } from "../types/finance";
 
 const BUILTIN_CATEGORIES = [...SEED_CATEGORIES, FALLBACK_CATEGORY];
@@ -26,7 +27,7 @@ Return JSON only: {"category":"CategoryName","confidence":0.0-1.0,"explanation":
 
 Transaction:
 - date: ${input.date}
-- description: ${input.description}
+- description: ${redactForAiAssist(input.description)}
 - amount: ${input.amount}`;
 
   const response = await fetch(
