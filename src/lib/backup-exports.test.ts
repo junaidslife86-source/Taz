@@ -101,7 +101,9 @@ describe("backup export modes", () => {
     expect(backup.exportKind).toBe("statement_templates");
     expect(backup.templates[0]?.statementFormat).toBe("westpac_credit_card");
     expect(backup.parserCatalog.parsingEdgeCases.length).toBeGreaterThan(0);
-    expect(JSON.stringify(backup)).not.toMatch(/WOOLWORTHS|t1|Family home/i);
+    const json = JSON.stringify(backup);
+    expect(json).not.toMatch(/WOOLWORTHS|Family home|"id":"t1"/i);
+    expect(backup).not.toHaveProperty("transactions");
   });
 
   it("encrypted backup round-trips and excludes API key by default", async () => {

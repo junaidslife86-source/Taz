@@ -42,10 +42,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "MyFinancePal",
-        short_name: "MyFinancePal",
+        name: "Taz",
+        short_name: "Taz",
         description:
-          "Privacy-first personal finance tracker that runs locally in your browser.",
+          "Taz — privacy-first personal finance tracker that runs locally in your browser.",
         theme_color: "#2563eb",
         background_color: "#f8fafc",
         display: "standalone",

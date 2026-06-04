@@ -1,3 +1,4 @@
+import { APP_NAME } from "../constants/app";
 import { APP_VERSION } from "../types/finance";
 import type {
   AppSettings,
@@ -67,7 +68,7 @@ export function createBackupExport(
   }
 
   return {
-    appName: "MyFinancePal",
+    appName: APP_NAME,
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     transactions: state.transactions,

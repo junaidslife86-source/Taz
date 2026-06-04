@@ -2,6 +2,8 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { useFinanceStore } from "./lib/storage";
+import "@fontsource/syne/600.css";
+import "@fontsource/syne/700.css";
 import "./styles/globals.css";
 
 function Bootstrap() {
@@ -27,7 +29,6 @@ function Bootstrap() {
     return (
       <div className="loading-screen">
         <span className="loading-spinner" aria-hidden="true" />
-        <p>Loading MyFinancePal…</p>
       </div>
     );
   }

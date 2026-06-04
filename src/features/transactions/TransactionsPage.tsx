@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Header } from "../../components/Header";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
@@ -12,6 +13,10 @@ import { formatCurrency, formatDate } from "../../lib/formatters";
 import { formatCategoryLabel } from "../../lib/category-display";
 import type { Transaction, TransactionType } from "../../types/finance";
 import { transactionSchema } from "../../lib/validation";
+import {
+  matchesTransactionSearch,
+  TRANSACTION_SEARCH_PARAM,
+} from "../../lib/transaction-search-query";
 
 const emptyForm = {
   date: new Date().toISOString().slice(0, 10),
@@ -34,7 +39,15 @@ export function TransactionsPage() {
     rememberCategoryRule,
   } = useFinanceStore();
 
-  const [search, setSearch] = useState("");
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get(TRANSACTION_SEARCH_PARAM) ?? "";
+  const setSearch = (value: string) => {
+    const trimmed = value.trim();
+    setSearchParams(trimmed ? { [TRANSACTION_SEARCH_PARAM]: trimmed } : {}, {
+      replace: true,
+    });
+  };
   const [categoryFilter, setCategoryFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -43,12 +56,18 @@ export function TransactionsPage() {
   const [newCategory, setNewCategory] = useState("");
   const [newCategoryEmoji, setNewCategoryEmoji] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const state = location.state as { categoryFilter?: string } | null;
+    if (state?.categoryFilter) {
+      setCategoryFilter(state.categoryFilter);
+    }
+  }, [location.state]);
   const rememberPrompt = useRememberRulePrompt();
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase()))
-        return false;
+      if (!matchesTransactionSearch(t, search)) return false;
       if (categoryFilter && t.category !== categoryFilter) return false;
       if (dateFrom && t.date < dateFrom) return false;
       if (dateTo && t.date > dateTo) return false;
@@ -247,7 +266,8 @@ export function TransactionsPage() {
         <div className="filters-row">
           <input
             type="search"
-            placeholder="Search description..."
+            placeholder="Search any transactions"
+            aria-label="Search any transactions"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="filter-input"

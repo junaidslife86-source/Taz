@@ -1,182 +1,352 @@
-import { lazy, Suspense } from "react";
-import { Link } from "react-router-dom";
-import { Header } from "../../components/Header";
-import { StatCard } from "../../components/StatCard";
-import { DataTable } from "../../components/DataTable";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { EmptyState } from "../../components/EmptyState";
 import { PageLoader } from "../../components/PageLoader";
 import { useFinanceStore } from "../../lib/storage";
-import {
-  totalAssets,
-  totalLiabilities,
-  netWorth,
-  monthlyIncome,
-  monthlyExpenses,
-  cashBalance,
-  investmentBalance,
-  spendingByCategory,
-  assetAllocation,
-} from "../../lib/calculations";
-import { formatCurrency, formatShortDate } from "../../lib/formatters";
 import { formatCategoryLabel } from "../../lib/category-display";
-import type { Transaction } from "../../types/finance";
+import type { Category } from "../../types/finance";
 import { DISCLAIMER } from "../../types/finance";
+import {
+  buildCashFlowSeries,
+  buildCategorySpendRows,
+  buildInsights,
+  buildOverviewSummary,
+  buildRecentTransactionRows,
+  buildRecurringSpendForYear,
+  buildUpcomingBills,
+  buildYearPeriodDetails,
+  comparisonLabel,
+  listMonthOptionsFromTransactions,
+  listYearOptionsFromTransactions,
+  type MonthOption,
+  type OverviewPeriod,
+  type OverviewPeriodMode,
+} from "../../lib/overview-metrics";
+import {
+  enumerateTrailingMonthKeys,
+  enumerateYearMonthKeys,
+  filterTransactionsForTrendWindow,
+} from "../../lib/spend-trend-data";
+import { OverviewHeader } from "./components/OverviewHeader";
+import { SummaryMetricCard } from "./components/SummaryMetricCard";
+import { InsightsCard } from "./components/InsightsCard";
+import { CategorySpendingCard } from "./components/CategorySpendingCard";
+import { CashFlowCard } from "./components/CashFlowCard";
+import { UpcomingBillsCard } from "./components/UpcomingBillsCard";
+import { RecentTransactionsCard } from "./components/RecentTransactionsCard";
+import { YearSpendDetailsCard } from "./components/YearSpendDetailsCard";
+import { RecurringSpendCard } from "./components/RecurringSpendCard";
 
-const SpendingBarChart = lazy(
-  () => import("../../components/charts/SpendingBarChart"),
+const SpendTrendChart = lazy(
+  () => import("../../components/charts/SpendTrendChart"),
 );
-const AllocationPieChart = lazy(
-  () => import("../../components/charts/AllocationPieChart"),
-);
+
+function resolveCategoryFilter(name: string, categories: Category[]): string {
+  const match = categories.find(
+    (c) => c.name.toLowerCase() === name.toLowerCase(),
+  );
+  return match?.name ?? name;
+}
 
 export function DashboardPage() {
-  const { transactions, assets, liabilities, categories, settings } =
-    useFinanceStore();
+  const navigate = useNavigate();
+  const { transactions, assets, categories, settings } = useFinanceStore();
 
-  const assetsTotal = totalAssets(assets);
-  const liabilitiesTotal = totalLiabilities(liabilities);
-  const nw = netWorth(assets, liabilities);
-  const income = monthlyIncome(transactions);
-  const expenses = monthlyExpenses(transactions);
-  const cash = cashBalance(assets);
-  const investments = investmentBalance(assets);
-  const categorySpending = spendingByCategory(transactions).map((row) => ({
-    ...row,
-    category: formatCategoryLabel(row.category, categories),
-  }));
-  const allocation = assetAllocation(assets);
+  const monthOptions = useMemo(
+    () => listMonthOptionsFromTransactions(transactions),
+    [transactions],
+  );
+  const yearOptions = useMemo(
+    () => listYearOptionsFromTransactions(transactions),
+    [transactions],
+  );
 
-  const latestTransactions = transactions.slice(0, 8);
+  const [periodMode, setPeriodMode] = useState<OverviewPeriodMode>("month");
+  const [monthKey, setMonthKey] = useState<string | null>(null);
+  const [year, setYear] = useState<number | null>(null);
 
-  const netWorthChartData =
-    assets.length > 0 || liabilities.length > 0
-      ? [
-          { name: "Assets", value: assetsTotal },
-          { name: "Liabilities", value: liabilitiesTotal },
-        ]
-      : [];
+  const selectedMonth: MonthOption = useMemo(() => {
+    const fallback = monthOptions[monthOptions.length - 1]!;
+    if (!monthKey) return fallback;
+    return monthOptions.find((m) => m.key === monthKey) ?? fallback;
+  }, [monthOptions, monthKey]);
 
-  const pieData =
-    allocation.length > 0 ? allocation : netWorthChartData;
+  const selectedYear = useMemo(() => {
+    const fallback = yearOptions[yearOptions.length - 1]?.year ?? new Date().getFullYear();
+    if (year === null) return fallback;
+    return yearOptions.find((y) => y.year === year)?.year ?? fallback;
+  }, [yearOptions, year]);
+
+  const period: OverviewPeriod = useMemo(
+    () =>
+      periodMode === "month"
+        ? { mode: "month", month: selectedMonth }
+        : { mode: "year", year: selectedYear },
+    [periodMode, selectedMonth, selectedYear],
+  );
+
+  const compareLabel = comparisonLabel(period);
+
+  const summary = useMemo(
+    () => buildOverviewSummary(transactions, assets, period),
+    [transactions, assets, period],
+  );
+
+  const yearDetails = useMemo(
+    () =>
+      period.mode === "year"
+        ? buildYearPeriodDetails(transactions, period.year)
+        : null,
+    [transactions, period],
+  );
+
+  const categoryRows = useMemo(
+    () =>
+      buildCategorySpendRows(transactions, period).map((row) => ({
+        ...row,
+        name: formatCategoryLabel(row.name, categories),
+      })),
+    [transactions, period, categories],
+  );
+
+  const insights = useMemo(
+    () => buildInsights(transactions, period, summary),
+    [transactions, period, summary],
+  );
+
+  const cashFlow = useMemo(
+    () => buildCashFlowSeries(transactions, period),
+    [transactions, period],
+  );
+
+  const bills = useMemo(
+    () =>
+      period.mode === "month"
+        ? buildUpcomingBills(transactions, period.month).map((b) => ({
+            ...b,
+            category: formatCategoryLabel(b.category, categories),
+          }))
+        : [],
+    [transactions, period, categories],
+  );
+
+  const recurringYear = useMemo(
+    () =>
+      period.mode === "year"
+        ? buildRecurringSpendForYear(transactions, period.year).map((r) => ({
+            ...r,
+            category: formatCategoryLabel(r.category, categories),
+          }))
+        : [],
+    [transactions, period, categories],
+  );
+
+  const recentRows = useMemo(() => {
+    const rows = buildRecentTransactionRows(transactions, period, categories, 12);
+    return rows.map((r) => ({
+      ...r,
+      categoryLabel: formatCategoryLabel(r.categoryLabel, categories),
+    }));
+  }, [transactions, period, categories]);
+
+  const trendMonthKeys = useMemo(() => {
+    if (period.mode === "year") {
+      return enumerateYearMonthKeys(period.year);
+    }
+    return enumerateTrailingMonthKeys(selectedMonth.key, 12);
+  }, [period, selectedMonth.key]);
+
+  const trendTransactions = useMemo(
+    () => filterTransactionsForTrendWindow(transactions, trendMonthKeys),
+    [transactions, trendMonthKeys],
+  );
+
+  const hasAnyData = transactions.length > 0 || assets.length > 0;
+  const isYear = period.mode === "year";
+
+  const handleCategoryClick = (name: string) => {
+    navigate("/transactions", {
+      state: { categoryFilter: resolveCategoryFilter(name, categories) },
+    });
+  };
+
+  const periodSelectLabel =
+    period.mode === "month" ? selectedMonth.label : String(selectedYear);
 
   return (
-    <div className="page">
-      <Header
-        title="Dashboard"
-        subtitle="Your financial overview at a glance"
+    <div className="page overview-page">
+      <OverviewHeader
+        period={period}
+        monthOptions={monthOptions}
+        yearOptions={yearOptions}
+        onPeriodModeChange={setPeriodMode}
+        onMonthChange={setMonthKey}
+        onYearChange={setYear}
       />
 
-      <div className="stat-grid">
-        <StatCard label="Total assets" value={assetsTotal} variant="positive" />
-        <StatCard label="Total liabilities" value={liabilitiesTotal} variant="negative" />
-        <StatCard
-          label="Net worth"
-          value={nw}
-          variant={nw >= 0 ? "positive" : "negative"}
+      {!hasAnyData ? (
+        <EmptyState
+          icon="📊"
+          title="Welcome to your overview"
+          description="Import a statement or add transactions to see income, spending, and insights."
+          action={
+            <Link to="/import" className="btn btn-primary">
+              Import statements
+            </Link>
+          }
         />
-        <StatCard label="Monthly income" value={income} variant="positive" />
-        <StatCard label="Monthly expenses" value={expenses} variant="negative" />
-        <StatCard label="Cash balance" value={cash} />
-        <StatCard label="Investments" value={investments} />
-      </div>
-
-      <div className="dashboard-grid">
-        <section className="card">
-          <h2>Spending by category</h2>
-          {categorySpending.length === 0 ? (
-            <EmptyState
-              icon="📈"
-              title="No spending data yet"
-              description="Import a statement or add transactions to see your spending breakdown."
-              action={
-                <Link to="/import" className="btn btn-primary btn-sm">
-                  Import statements
-                </Link>
-              }
+      ) : (
+        <>
+          <div className="overview-summary-grid">
+            <SummaryMetricCard
+              label="Income"
+              amount={summary.income}
+              currency={settings.defaultCurrency}
+              changePct={summary.incomeChangePct}
+              changeLabel={compareLabel}
+              sparkline={summary.incomeSparkline}
+              tone="income"
+              icon={<IncomeIcon />}
             />
-          ) : (
-            <Suspense fallback={<PageLoader label="Loading chart…" />}>
-              <SpendingBarChart
-                data={categorySpending.slice(0, 8)}
+            <SummaryMetricCard
+              label="Spent"
+              amount={summary.spent}
+              currency={settings.defaultCurrency}
+              changePct={summary.spentChangePct}
+              changeLabel={compareLabel}
+              sparkline={summary.spentSparkline}
+              tone="spent"
+              icon={<SpentIcon />}
+            />
+            <SummaryMetricCard
+              label={isYear ? "Net (income − spent)" : "Left to Spend"}
+              amount={summary.leftToSpend}
+              currency={settings.defaultCurrency}
+              changePct={summary.leftChangePct}
+              changeLabel={compareLabel}
+              sparkline={summary.leftSparkline}
+              tone="left"
+              icon={<WalletIcon />}
+            />
+            <SummaryMetricCard
+              label={isYear ? "Year surplus (projected)" : "Projected End Balance"}
+              amount={summary.projectedEndBalance}
+              currency={settings.defaultCurrency}
+              changePct={null}
+              statusLabel={summary.projectedLabel}
+              sparkline={summary.projectedSparkline}
+              tone="projected"
+              icon={<CalendarBalanceIcon />}
+            />
+          </div>
+
+          {yearDetails ? (
+            <YearSpendDetailsCard
+              details={yearDetails}
+              currency={settings.defaultCurrency}
+            />
+          ) : null}
+
+          {isYear ? (
+            <section className="overview-card overview-year-trend">
+              <div className="overview-card__header">
+                <h2 className="overview-card__title">Spending trend ({selectedYear})</h2>
+                <p className="muted overview-year-trend__hint">
+                  Month-by-month expenses for the full year
+                </p>
+              </div>
+              <Suspense fallback={<PageLoader label="Loading trend…" />}>
+                <SpendTrendChart
+                  transactions={trendTransactions}
+                  momPeriodKeys={trendMonthKeys}
+                  currency={settings.defaultCurrency}
+                />
+              </Suspense>
+            </section>
+          ) : null}
+
+          <div className="overview-grid overview-grid--insights">
+            <InsightsCard insights={insights} />
+            <CategorySpendingCard
+              rows={categoryRows}
+              currency={settings.defaultCurrency}
+              onCategoryClick={handleCategoryClick}
+            />
+          </div>
+
+          <div className="overview-grid overview-grid--charts">
+            <CashFlowCard
+              data={cashFlow}
+              currency={settings.defaultCurrency}
+              periodLabel={periodSelectLabel}
+              isYearView={isYear}
+            />
+            {isYear ? (
+              <RecurringSpendCard
+                rows={recurringYear}
+                currency={settings.defaultCurrency}
+                year={selectedYear}
+              />
+            ) : (
+              <UpcomingBillsCard
+                bills={bills}
                 currency={settings.defaultCurrency}
               />
-            </Suspense>
-          )}
-        </section>
+            )}
+          </div>
 
-        <section className="card">
-          <h2>Net worth breakdown</h2>
-          {pieData.length === 0 ? (
-            <EmptyState
-              icon="💼"
-              title="No assets or liabilities yet"
-              description="Add your assets and liabilities to see your net worth breakdown."
-              action={
-                <Link to="/assets" className="btn btn-primary btn-sm">
-                  Add assets
-                </Link>
-              }
-            />
-          ) : (
-            <Suspense fallback={<PageLoader label="Loading chart…" />}>
-              <AllocationPieChart
-                data={pieData}
-                currency={settings.defaultCurrency}
-              />
-            </Suspense>
-          )}
-        </section>
-      </div>
-
-      <section className="card">
-        <div className="card-header-row">
-          <h2>Latest transactions</h2>
-          <Link to="/transactions" className="btn btn-secondary btn-sm">
-            View all
-          </Link>
-        </div>
-        {latestTransactions.length === 0 ? (
-          <EmptyState
-            icon="💳"
-            title="No transactions yet"
-            description="Import a bank statement or add a transaction manually."
-            action={
-              <Link to="/import" className="btn btn-primary btn-sm">
-                Import statements
-              </Link>
+          <RecentTransactionsCard
+            rows={recentRows}
+            currency={settings.defaultCurrency}
+            comparisonLabel={
+              isYear ? "Category vs last year" : "Compared to last month"
             }
           />
-        ) : (
-          <DataTable<Transaction>
-            data={latestTransactions}
-            keyField="id"
-            columns={[
-              {
-                key: "date",
-                header: "Date",
-                render: (t) => formatShortDate(t.date),
-              },
-              { key: "description", header: "Description" },
-              {
-                key: "amount",
-                header: "Amount",
-                render: (t) => (
-                  <span className={t.amount >= 0 ? "text-positive" : "text-negative"}>
-                    {formatCurrency(t.amount, settings.defaultCurrency)}
-                  </span>
-                ),
-              },
-              {
-                key: "category",
-                header: "Category",
-                render: (t) => formatCategoryLabel(t.category, categories),
-              },
-            ]}
-          />
-        )}
-      </section>
+        </>
+      )}
 
       <p className="disclaimer">{DISCLAIMER}</p>
     </div>
+  );
+}
+
+function IncomeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <line x1="12" x2="12" y1="19" y2="5" />
+      <polyline points="19 12 12 5 5 12" />
+    </svg>
+  );
+}
+
+function SpentIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <line x1="12" x2="12" y1="5" y2="19" />
+      <polyline points="19 12 12 19 5 12" />
+    </svg>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </svg>
+  );
+}
+
+function CalendarBalanceIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 14h.01" />
+      <path d="M12 14h.01" />
+      <path d="M16 14h.01" />
+    </svg>
   );
 }

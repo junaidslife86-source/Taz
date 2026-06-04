@@ -16,6 +16,7 @@ import {
   formatLabel,
 } from "../../lib/statement-profiles";
 import { formatCategoryLabel } from "../../lib/category-display";
+import { APP_NAME } from "../../constants/app";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -94,7 +95,7 @@ export function SettingsPage() {
       });
       downloadJson(
         backup,
-        `myfinancepal-encrypted-backup-${dateStamp()}.json`,
+        `taz-encrypted-backup-${dateStamp()}.json`,
       );
       setShowEncryptedExport(false);
       setExportPassword("");
@@ -115,7 +116,7 @@ export function SettingsPage() {
 
   const handleStrippedExport = () => {
     const backup = exportStrippedDiagnosticBackup();
-    downloadJson(backup, `myfinancepal-diagnostic-${dateStamp()}.json`);
+    downloadJson(backup, `taz-diagnostic-${dateStamp()}.json`);
     setMessage({
       type: "success",
       text: "Stripped diagnostic backup downloaded (not restorable).",
@@ -124,7 +125,7 @@ export function SettingsPage() {
 
   const handleTemplateExport = () => {
     const backup = exportStatementTemplateBackup();
-    downloadJson(backup, `myfinancepal-templates-${dateStamp()}.json`);
+    downloadJson(backup, `taz-templates-${dateStamp()}.json`);
     setMessage({
       type: "success",
       text: "Statement template export downloaded (not restorable).",
@@ -263,7 +264,7 @@ export function SettingsPage() {
       <section className="card">
         <h2>Categorisation rules</h2>
         <p className="help-text">
-          MyFinancePal categorises transactions locally using keyword rules. User rules take priority over defaults.
+          {APP_NAME} categorises transactions locally using keyword rules. User rules take priority over defaults.
         </p>
 
         <h3>Your rules</h3>
@@ -422,8 +423,8 @@ export function SettingsPage() {
           />
         </label>
         <p className="help-text">
-          Stored only in this browser (IndexedDB). Never shared with MyFinancePal
-          servers — requests go directly from your device to Google.
+          Stored only in this browser (IndexedDB). Not uploaded to any server —
+          requests go directly from your device to Google.
         </p>
         <div className="form-actions">
           <button
@@ -730,7 +731,7 @@ export function SettingsPage() {
       <section className="card">
         <h2>About</h2>
         <p>
-          <strong>MyFinancePal</strong> v{APP_VERSION}
+          <strong>{APP_NAME}</strong> v{APP_VERSION}
         </p>
         <p className="help-text">
           Offline-ready personal finance tracker. No accounts, no cloud, no tracking.

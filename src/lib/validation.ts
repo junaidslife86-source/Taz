@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_BACKUP_APP_NAMES } from "../constants/app";
 
 const MAX_STRING = 500;
 const MAX_DESC = 1_000;
@@ -158,7 +159,7 @@ const backupSettingsSchema = z.object({
 
 export const strictBackupSchema = z
   .object({
-    appName: z.literal("MyFinancePal"),
+    appName: z.enum(SUPPORTED_BACKUP_APP_NAMES),
     version: z.string().max(32),
     exportedAt: z.string().max(64),
     transactions: z.array(transactionRecordSchema).max(MAX_TRANSACTIONS),

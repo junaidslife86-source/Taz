@@ -5,7 +5,7 @@ import { PRIVACY_STATEMENT } from "../../types/finance";
 
 const steps = [
   {
-    title: "Welcome to MyFinancePal",
+    title: "Welcome to Taz",
     body: "Your friendly personal finance companion. Track spending, assets, and net worth — all in one place, right in your browser.",
     icon: "👋",
   },

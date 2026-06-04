@@ -1,3 +1,5 @@
+import { APP_NAME, isSupportedBackupAppName } from "../constants/app";
+import type { BackupAppName } from "../constants/app";
 import { ImportLimitError } from "./security-limits";
 
 export const PBKDF2_ITERATIONS = 310_000;
@@ -6,7 +8,7 @@ const IV_BYTES = 12;
 
 export type EncryptedBackupEnvelope = {
   exportKind: "encrypted_full";
-  appName: "MyFinancePal";
+  appName: BackupAppName;
   version: string;
   exportedAt: string;
   algorithm: "AES-GCM";
@@ -94,7 +96,7 @@ export async function encryptBackupPayload(
 
   return {
     exportKind: "encrypted_full",
-    appName: "MyFinancePal",
+    appName: APP_NAME,
     version: meta.version,
     exportedAt: meta.exportedAt,
     algorithm: "AES-GCM",
@@ -148,7 +150,7 @@ export function isEncryptedBackupEnvelope(
   const o = data as Record<string, unknown>;
   return (
     o.exportKind === "encrypted_full" &&
-    o.appName === "MyFinancePal" &&
+    isSupportedBackupAppName(o.appName) &&
     typeof o.ciphertext === "string" &&
     typeof o.salt === "string" &&
     typeof o.iv === "string"

@@ -1,3 +1,5 @@
+import { APP_NAME } from "../constants/app";
+import type { BackupAppName } from "../constants/app";
 import { APP_VERSION } from "../types/finance";
 import type {
   AppSettings,
@@ -54,7 +56,7 @@ function buildStablePseudonymMap(
 
 export type StrippedDiagnosticBackup = {
   exportKind: "diagnostic_stripped";
-  appName: "MyFinancePal";
+  appName: BackupAppName;
   version: string;
   exportedAt: string;
   purpose: "support_debugging";
@@ -114,7 +116,7 @@ export type StrippedDiagnosticBackup = {
 
 export type StatementTemplateBackup = {
   exportKind: "statement_templates";
-  appName: "MyFinancePal";
+  appName: BackupAppName;
   version: string;
   exportedAt: string;
   purpose: "community_parser_sharing";
@@ -198,7 +200,7 @@ export function createStrippedDiagnosticBackup(
 
   return {
     exportKind: "diagnostic_stripped",
-    appName: "MyFinancePal",
+    appName: APP_NAME,
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     purpose: "support_debugging",
@@ -288,7 +290,7 @@ export function createStatementTemplateBackup(
 
   return {
     exportKind: "statement_templates",
-    appName: "MyFinancePal",
+    appName: APP_NAME,
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     purpose: "community_parser_sharing",

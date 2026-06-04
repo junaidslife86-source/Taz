@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { INDEXED_DB_NAME } from "../constants/app";
 import type {
   AppSettings,
   Asset,
@@ -31,7 +32,7 @@ export class FinanceDatabase extends Dexie {
   settings!: Table<AppSettings & { id: string }, string>;
 
   constructor() {
-    super("MyFinancePal");
+    super(INDEXED_DB_NAME);
     this.version(1).stores({
       transactions: "id, date, category, type, importedAt",
       assets: "id, assetType, updatedAt",
