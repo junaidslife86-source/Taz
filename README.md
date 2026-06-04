@@ -1,10 +1,10 @@
-# MyFinancePal
+# Taz
 
-**MyFinancePal** is a privacy-first, offline-first personal finance web app that runs entirely in your browser. Track spending, import bank statements, manage assets and liabilities, and watch your net worth — without accounts, cloud sync, or third-party services.
+**Taz** is a privacy-first, offline-first personal finance web app that runs entirely in your browser. Track spending, import bank statements, manage assets and liabilities, and watch your net worth — without accounts, cloud sync, or third-party services.
 
 Your financial data stays on your device. Always.
 
-MyFinancePal is a serverless personal finance app — it runs entirely in your browser with no MyFinancePal backend. Deploy it as static files; your data stays on your device unless you optionally enable AI Assist with your own Gemini API key.
+Taz is a serverless personal finance app — it runs entirely in your browser with no Taz backend. Deploy it as static files; your data stays on your device unless you optionally enable AI Assist with your own Gemini API key.
 
 ---
 
@@ -55,7 +55,7 @@ MyFinancePal is a serverless personal finance app — it runs entirely in your b
 
 ```bash
 git clone <repo-url>
-cd MyFinancePal
+cd Taz
 npm install --legacy-peer-deps
 npm run dev
 ```
@@ -115,7 +115,7 @@ When enabled, only transactions that local rules cannot categorise may send desc
 ## Project structure
 
 ```
-MyFinancePal/
+Taz/
   public/           Static assets and PWA icons
   sample-data/      Sample import files
   src/
@@ -141,7 +141,7 @@ Run `npm test` and `npm audit` before deploying.
 
 ## Limitations
 
-MyFinancePal is a personal finance tracking tool, not financial advice. PDF import quality varies by bank. Stock/ETF values are manual. Data lives in your browser profile unless you export a backup.
+Taz is a personal finance tracking tool, not financial advice. PDF import quality varies by bank. Stock/ETF values are manual. Data lives in your browser profile unless you export a backup.
 
 ---
 
