@@ -150,6 +150,52 @@ export const snapshotRecordSchema = z.object({
   netWorth: z.number().finite(),
 });
 
+export const goalSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  kind: z.enum(["savings", "debt"]),
+  targetAmount: z.number().positive("Target amount must be greater than zero"),
+  baselineAmount: z.number().min(0, "Amount must be zero or greater"),
+  monthlyPlan: z.number().min(0, "Monthly plan must be zero or greater"),
+  targetDate: z.string().optional(),
+  linkedAssetIds: z.array(z.string().max(64)).max(50),
+  linkedLiabilityIds: z.array(z.string().max(64)).max(50),
+  linkedTransactionIds: z.array(z.string().max(64)).max(500),
+  notes: z.string().max(MAX_DESC).optional(),
+});
+
+export const goalRecordSchema = z.object({
+  id: idSchema,
+  name: shortText,
+  kind: goalSchema.shape.kind,
+  targetAmount: z.number().finite().positive(),
+  baselineAmount: z.number().finite().min(0),
+  monthlyPlan: z.number().finite().min(0),
+  targetDate: isoDate.optional(),
+  linkedAssetIds: z.array(idSchema).max(50),
+  linkedLiabilityIds: z.array(idSchema).max(50),
+  linkedTransactionIds: z.array(idSchema).max(500),
+  notes: optionalShortText,
+  createdAt: z.string().max(64),
+  updatedAt: z.string().max(64),
+});
+
+export const goalEntrySchema = z.object({
+  date: z.string().min(1, "Date is required"),
+  amount: z.number().positive("Amount must be greater than zero"),
+  kind: z.enum(["contribution", "withdrawal"]),
+  note: z.string().max(MAX_DESC).optional(),
+});
+
+export const goalEntryRecordSchema = z.object({
+  id: idSchema,
+  goalId: idSchema,
+  date: isoDate,
+  amount: z.number().finite().positive(),
+  kind: goalEntrySchema.shape.kind,
+  note: optionalShortText,
+  createdAt: z.string().max(64),
+});
+
 const backupSettingsSchema = z.object({
   onboardingComplete: z.boolean(),
   defaultCurrency: z.string().min(1).max(8),
@@ -172,6 +218,8 @@ export const strictBackupSchema = z
       .max(MAX_ARRAY_ITEMS)
       .optional(),
     netWorthSnapshots: z.array(snapshotRecordSchema).max(MAX_ARRAY_ITEMS),
+    goals: z.array(goalRecordSchema).max(MAX_ARRAY_ITEMS).optional(),
+    goalEntries: z.array(goalEntryRecordSchema).max(MAX_ARRAY_ITEMS).optional(),
     settings: backupSettingsSchema,
   })
   .strict();

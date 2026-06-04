@@ -5,6 +5,8 @@ import type {
   Asset,
   Category,
   CategoryRule,
+  Goal,
+  GoalEntry,
   Liability,
   NetWorthSnapshot,
   StatementProfile,
@@ -29,6 +31,8 @@ export class FinanceDatabase extends Dexie {
   categoryRules!: Table<CategoryRule, string>;
   statementProfiles!: Table<StatementProfile, string>;
   netWorthSnapshots!: Table<NetWorthSnapshot, string>;
+  goals!: Table<Goal, string>;
+  goalEntries!: Table<GoalEntry, string>;
   settings!: Table<AppSettings & { id: string }, string>;
 
   constructor() {
@@ -58,6 +62,18 @@ export class FinanceDatabase extends Dexie {
       categoryRules: "id, category, source",
       statementProfiles: "id, accountName, lastUsedAt",
       netWorthSnapshots: "id, date",
+      settings: "id",
+    });
+    this.version(4).stores({
+      transactions: "id, date, category, type, importedAt",
+      assets: "id, assetType, updatedAt",
+      liabilities: "id, liabilityType, updatedAt",
+      categories: "id, name",
+      categoryRules: "id, category, source",
+      statementProfiles: "id, accountName, lastUsedAt",
+      netWorthSnapshots: "id, date",
+      goals: "id, kind, targetDate, updatedAt",
+      goalEntries: "id, goalId, date",
       settings: "id",
     });
   }
@@ -217,6 +233,8 @@ export async function clearAllData(): Promise<void> {
     db.categoryRules.clear(),
     db.statementProfiles.clear(),
     db.netWorthSnapshots.clear(),
+    db.goals.clear(),
+    db.goalEntries.clear(),
   ]);
   await initializeDatabase();
 }

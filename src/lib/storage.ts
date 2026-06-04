@@ -13,6 +13,8 @@ import type {
   CategorisationResult,
   Category,
   CategoryRule,
+  Goal,
+  GoalEntry,
   Liability,
   NetWorthSnapshot,
   StatementProfile,
@@ -53,6 +55,8 @@ type FinanceState = {
   categoryRules: CategoryRule[];
   statementProfiles: StatementProfile[];
   netWorthSnapshots: NetWorthSnapshot[];
+  goals: Goal[];
+  goalEntries: GoalEntry[];
   settings: AppSettings;
   initialize: () => Promise<void>;
   loadAll: () => Promise<void>;
@@ -91,6 +95,11 @@ type FinanceState = {
   ) => Promise<Transaction[]>;
   addSnapshot: (s: NetWorthSnapshot) => Promise<void>;
   deleteSnapshot: (id: string) => Promise<void>;
+  addGoal: (goal: Goal) => Promise<void>;
+  updateGoal: (goal: Goal) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+  addGoalEntry: (entry: GoalEntry) => Promise<void>;
+  deleteGoalEntry: (id: string) => Promise<void>;
   setOnboardingComplete: (complete: boolean) => Promise<void>;
   updateAppSettings: (partial: Partial<AppSettings>) => Promise<void>;
   exportBackup: (options?: BackupExportOptions) => BackupFile;
@@ -121,6 +130,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   categoryRules: [],
   statementProfiles: [],
   netWorthSnapshots: [],
+  goals: [],
+  goalEntries: [],
   settings: {
     onboardingComplete: false,
     defaultCurrency: "AUD",
@@ -144,6 +155,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       categoryRules,
       statementProfiles,
       netWorthSnapshots,
+      goals,
+      goalEntries,
       settings,
     ] = await Promise.all([
       db.transactions.orderBy("date").reverse().toArray(),
@@ -153,6 +166,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       db.categoryRules.toArray(),
       db.statementProfiles.orderBy("lastUsedAt").reverse().toArray(),
       db.netWorthSnapshots.orderBy("date").reverse().toArray(),
+      db.goals.orderBy("updatedAt").reverse().toArray(),
+      db.goalEntries.orderBy("date").reverse().toArray(),
       getSettings(),
     ]);
     set({
@@ -163,6 +178,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       categoryRules,
       statementProfiles,
       netWorthSnapshots,
+      goals,
+      goalEntries,
       settings,
     });
   },
@@ -401,6 +418,33 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     await get().loadAll();
   },
 
+  addGoal: async (goal) => {
+    await db.goals.put(goal);
+    await get().loadAll();
+  },
+
+  updateGoal: async (goal) => {
+    await db.goals.put(goal);
+    await get().loadAll();
+  },
+
+  deleteGoal: async (id) => {
+    const entries = get().goalEntries.filter((e) => e.goalId === id);
+    await db.goalEntries.bulkDelete(entries.map((e) => e.id));
+    await db.goals.delete(id);
+    await get().loadAll();
+  },
+
+  addGoalEntry: async (entry) => {
+    await db.goalEntries.put(entry);
+    await get().loadAll();
+  },
+
+  deleteGoalEntry: async (id) => {
+    await db.goalEntries.delete(id);
+    await get().loadAll();
+  },
+
   setOnboardingComplete: async (complete) => {
     await updateSettings({ onboardingComplete: complete });
     const settings = await getSettings();
@@ -432,6 +476,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       db.categoryRules.clear(),
       db.statementProfiles.clear(),
       db.netWorthSnapshots.clear(),
+      db.goals.clear(),
+      db.goalEntries.clear(),
     ]);
     await Promise.all([
       db.transactions.bulkPut(parsed.transactions),
@@ -441,6 +487,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
       db.categoryRules.bulkPut(parsed.categoryRules ?? []),
       db.statementProfiles.bulkPut(parsed.statementProfiles ?? []),
       db.netWorthSnapshots.bulkPut(parsed.netWorthSnapshots),
+      db.goals.bulkPut(parsed.goals ?? []),
+      db.goalEntries.bulkPut(parsed.goalEntries ?? []),
     ]);
     await updateSettings(parsed.settings);
     await initializeDatabase();

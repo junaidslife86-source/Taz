@@ -69,6 +69,8 @@ const baseState = () => ({
     },
   ],
   netWorthSnapshots: [],
+  goals: [],
+  goalEntries: [],
   settings: {
     onboardingComplete: true,
     defaultCurrency: "AUD",

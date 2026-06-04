@@ -20,6 +20,7 @@ export const NAV_LINKS: NavLinkConfig[] = [
   { to: "/", label: "Overview", icon: "overview", end: true },
   { to: "/import", label: "Import Statements", icon: "import" },
   { to: "/transactions", label: "Transactions", icon: "transactions" },
+  { to: "/goals", label: "Goals", icon: "goals" },
   { to: "/assets", label: "Assets", icon: "assets" },
   { to: "/liabilities", label: "Liabilities", icon: "liabilities" },
   { to: "/net-worth", label: "Net Worth", icon: "net-worth" },

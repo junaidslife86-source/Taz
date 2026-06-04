@@ -22,6 +22,8 @@ const baseState = () => ({
   categoryRules: [],
   statementProfiles: [],
   netWorthSnapshots: [],
+  goals: [],
+  goalEntries: [],
   settings: {
     onboardingComplete: true,
     defaultCurrency: "AUD",

@@ -40,22 +40,28 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      includeAssets: ["favicon.png", "Taz.png"],
       manifest: {
         name: "Taz",
         short_name: "Taz",
         description:
           "Taz — privacy-first personal finance tracker that runs locally in your browser.",
-        theme_color: "#2563eb",
-        background_color: "#f8fafc",
+        theme_color: "#000000",
+        background_color: "#000000",
         display: "standalone",
         start_url: "/",
         icons: [
           {
-            src: "/favicon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
+            src: "/Taz.png",
+            sizes: "512x512",
+            type: "image/png",
             purpose: "any",
+          },
+          {
+            src: "/Taz.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },

@@ -115,6 +115,38 @@ export type NetWorthSnapshot = {
   netWorth: number;
 };
 
+/** `savings` = save for something; `debt` = pay down debt */
+export type GoalKind = "savings" | "debt";
+
+export type Goal = {
+  id: string;
+  name: string;
+  kind: GoalKind;
+  targetAmount: number;
+  /** Starting progress: already saved (savings) or already paid off (debt) */
+  baselineAmount: number;
+  monthlyPlan: number;
+  targetDate?: string;
+  linkedAssetIds: string[];
+  linkedLiabilityIds: string[];
+  linkedTransactionIds: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GoalEntryKind = "contribution" | "withdrawal";
+
+export type GoalEntry = {
+  id: string;
+  goalId: string;
+  date: string;
+  amount: number;
+  kind: GoalEntryKind;
+  note?: string;
+  createdAt: string;
+};
+
 export type AppSettings = {
   onboardingComplete: boolean;
   defaultCurrency: string;
@@ -133,6 +165,8 @@ export type BackupFile = {
   categoryRules: CategoryRule[];
   statementProfiles?: StatementProfile[];
   netWorthSnapshots: NetWorthSnapshot[];
+  goals?: Goal[];
+  goalEntries?: GoalEntry[];
   settings: AppSettings;
 };
 
@@ -201,7 +235,7 @@ export function isFallbackCategory(category: { name: string }): boolean {
   return category.name.trim().toLowerCase() === FALLBACK_CATEGORY.toLowerCase();
 }
 
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
 
 export const PDF_IMPORT_WARNING =
   "Taz can try to read PDF statements, but PDF formats vary by bank. Please review imported transactions before saving.";

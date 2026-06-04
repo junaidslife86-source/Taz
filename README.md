@@ -51,7 +51,25 @@ Taz is a serverless personal finance app — it runs entirely in your browser wi
 
 ---
 
-## Install & develop
+## Get started (no install)
+
+Taz runs in your web browser. You do **not** need Git, Node, or the command line to use it.
+
+1. **Open Taz** in Chrome, Edge, Safari, or Firefox — use your hosted link (for example `https://taz.vercel.app` after deploy).
+2. **Use it like a normal website** — bookmark the page if you like.
+3. **Optional: install as an app** (works offline after the first visit):
+   - **iPhone / iPad (Safari):** Share → **Add to Home Screen**
+   - **Android (Chrome):** Menu (⋮) → **Install app** or **Add to Home screen**
+   - **Mac (Chrome or Edge):** Install icon in the address bar, or menu → **Install Taz…**
+   - **Windows (Chrome or Edge):** **Install** in the address bar or app menu
+
+Your data stays on that device and browser. Export backups from **Settings** if you change phones or browsers.
+
+---
+
+## For developers
+
+Run Taz locally only if you are changing the code or hosting it yourself.
 
 ```bash
 git clone <repo-url>
@@ -62,16 +80,14 @@ npm run dev
 
 Open the URL shown in the terminal (usually `http://localhost:5173`).
 
----
-
-## Production build
+### Production build
 
 ```bash
 npm run build
 npm run preview   # optional: test the production build locally
 ```
 
-Deploy the contents of **`dist/`** to any static host (nginx, S3, GitHub Pages, etc.). No server runtime or environment variables are required.
+Deploy the contents of **`dist/`** to any static host (Vercel, nginx, S3, GitHub Pages, etc.). No server runtime or environment variables are required.
 
 ---
 

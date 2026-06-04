@@ -6,6 +6,8 @@ import type {
   Asset,
   Category,
   CategoryRule,
+  Goal,
+  GoalEntry,
   Liability,
   NetWorthSnapshot,
   StatementProfile,
@@ -33,6 +35,8 @@ export type BackupState = {
   categoryRules: CategoryRule[];
   statementProfiles: StatementProfile[];
   netWorthSnapshots: NetWorthSnapshot[];
+  goals: Goal[];
+  goalEntries: GoalEntry[];
   settings: AppSettings;
 };
 

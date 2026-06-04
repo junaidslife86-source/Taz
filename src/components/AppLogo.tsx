@@ -3,11 +3,11 @@ type AppLogoProps = {
   className?: string;
 };
 
-/** Brand mark from /public/Taz.svg */
+/** Brand mark from /public/Taz.png */
 export function AppLogo({ size = 40, className }: AppLogoProps) {
   return (
     <img
-      src="/Taz.svg"
+      src="/Taz.png"
       alt=""
       width={size}
       height={size}

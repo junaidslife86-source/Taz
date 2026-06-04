@@ -37,6 +37,10 @@ const LiabilitiesPage = lazyNamed(
   () => import("../features/liabilities/LiabilitiesPage"),
   "LiabilitiesPage",
 );
+const GoalsPage = lazyNamed(
+  () => import("../features/goals/GoalsPage"),
+  "GoalsPage",
+);
 const NetWorthPage = lazyNamed(
   () => import("../features/net-worth/NetWorthPage"),
   "NetWorthPage",
@@ -112,6 +116,14 @@ export function AppRoutes() {
                   element={
                     <LazyPage>
                       <LiabilitiesPage />
+                    </LazyPage>
+                  }
+                />
+                <Route
+                  path="goals"
+                  element={
+                    <LazyPage>
+                      <GoalsPage />
                     </LazyPage>
                   }
                 />

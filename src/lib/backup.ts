@@ -6,6 +6,8 @@ import type {
   BackupFile,
   Category,
   CategoryRule,
+  Goal,
+  GoalEntry,
   Liability,
   NetWorthSnapshot,
   StatementProfile,
@@ -52,6 +54,8 @@ export function createBackupExport(
     categoryRules: CategoryRule[];
     statementProfiles: StatementProfile[];
     netWorthSnapshots: NetWorthSnapshot[];
+    goals?: Goal[];
+    goalEntries?: GoalEntry[];
     settings: AppSettings;
   },
   options?: BackupExportOptions,
@@ -78,6 +82,8 @@ export function createBackupExport(
     categoryRules: state.categoryRules,
     statementProfiles: state.statementProfiles,
     netWorthSnapshots: state.netWorthSnapshots,
+    goals: state.goals ?? [],
+    goalEntries: state.goalEntries ?? [],
     settings: settings as AppSettings,
   };
 }
