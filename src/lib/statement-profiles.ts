@@ -3,6 +3,8 @@ import type {
   StatementFormat,
   StatementProfile,
 } from "../types/finance";
+import { hasWestpacTransactionTableMarkers } from "./statement-formats/westpac";
+
 const MATCH_THRESHOLD = 40;
 
 export function accountTypeFromFormat(
@@ -54,6 +56,22 @@ export function scoreProfile(
   let score = 0;
   const fn = filename.toLowerCase();
   const head = statementText.slice(0, 12_000).toLowerCase();
+
+  if (
+    profile.statementFormat === "westpac_credit_card" &&
+    hasWestpacTransactionTableMarkers(statementText)
+  ) {
+    return 0;
+  }
+
+  if (
+    profile.statementFormat === "westpac_transaction" &&
+    head.includes("date of transaction") &&
+    head.includes("mastercard") &&
+    !hasWestpacTransactionTableMarkers(statementText)
+  ) {
+    return 0;
+  }
 
   for (const pattern of profile.fileNamePatterns) {
     const p = pattern.toLowerCase().trim();

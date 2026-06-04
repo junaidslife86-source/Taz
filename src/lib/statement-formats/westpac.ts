@@ -9,7 +9,6 @@ import {
   parseStatementAmount,
   pickLineAmount,
   shouldSkipLine,
-  signedAmountFromDescription,
 } from "./common";
 import {
   extractStatementSummary,
@@ -28,11 +27,25 @@ import {
 } from "./westpac-cc-reducer";
 
 const WESTPAC_DC_DATE_START_RE = /^(\d{1,2}\/\d{1,2}\/\d{2})\s+(.*)$/;
+export function hasWestpacTransactionTableMarkers(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasSlashDateRows = /\d{1,2}\/\d{1,2}\/\d{2}\s+(?:deposit|withdrawal|statement)/i.test(
+    lower,
+  );
+  const hasDebitCreditTable =
+    (lower.includes("transaction description") ||
+      (lower.includes("debit") && lower.includes("credit") && lower.includes("balance"))) &&
+    hasSlashDateRows;
+  const hasSummary =
+    lower.includes("opening balance") && lower.includes("closing balance");
+  return hasDebitCreditTable && hasSummary;
+}
 
 export function isWestpacCreditCard(text: string, filename: string): boolean {
   const name = filename.toLowerCase();
   if (name.startsWith("cc_") || name.includes("credit card")) return true;
   const lower = text.toLowerCase();
+  if (hasWestpacTransactionTableMarkers(text)) return false;
   if (isWestpacTransactionAccount(text, filename)) return false;
   return (
     lower.includes("westpac") &&
@@ -47,9 +60,15 @@ export function isWestpacTransactionAccount(text: string, filename: string): boo
   if (name.startsWith("cc_") || name.includes("credit card")) return false;
   const lower = text.toLowerCase();
   if (!lower.includes("westpac")) return false;
-  if (lower.includes("mastercard") && lower.includes("date of transaction")) {
+  if (
+    lower.includes("mastercard") &&
+    lower.includes("date of transaction") &&
+    !hasWestpacTransactionTableMarkers(text)
+  ) {
     return false;
   }
+  if (hasWestpacTransactionTableMarkers(text)) return true;
+
   const hasSlashTxn = /\d{1,2}\/\d{1,2}\/\d{2}\s+(?:deposit|withdrawal)/i.test(lower);
   const hasBalanceSummary =
     lower.includes("opening balance") && lower.includes("closing balance");
@@ -93,6 +112,46 @@ function countRawAmountLines(text: string): number {
   return count;
 }
 
+function bufferHasAmounts(buffer: string): boolean {
+  return /[\d,]+\.\d{2}/.test(buffer);
+}
+
+function extractDecimalAmounts(text: string): string[] {
+  DECIMAL_AMOUNT_RE.lastIndex = 0;
+  return [...text.matchAll(DECIMAL_AMOUNT_RE)].map((m) => m[0]);
+}
+
+function amountFromDebitCreditColumns(
+  amountStrings: string[],
+  description: string,
+): number | null {
+  const parsed = amountStrings
+    .map(parseStatementAmount)
+    .filter((v): v is number => v !== null);
+  if (parsed.length === 0) return null;
+
+  const lower = description.toLowerCase();
+
+  if (parsed.length >= 3) {
+    const debit = parsed[parsed.length - 3]!;
+    const credit = parsed[parsed.length - 2]!;
+    if (debit > 0 && credit === 0) return -Math.abs(debit);
+    if (credit > 0 && debit === 0) return Math.abs(credit);
+  }
+
+  if (parsed.length === 2) {
+    const movement = parsed[0]!;
+    if (lower.includes("withdrawal") || /\bdebit\b/.test(lower)) {
+      return -Math.abs(movement);
+    }
+    if (lower.includes("deposit") || /\bcredit\b/.test(lower)) {
+      return Math.abs(movement);
+    }
+  }
+
+  return pickLineAmount(amountStrings, description);
+}
+
 function emitWestpacDcBuffer(
   buffer: string,
   seen: Set<string>,
@@ -107,18 +166,25 @@ function emitWestpacDcBuffer(
   const rest = match[2].trim();
   if (shouldSkipLine(rest)) return;
 
-  const amounts = [...rest.matchAll(DECIMAL_AMOUNT_RE)];
-  if (amounts.length === 0) return;
+  const amountStrings = extractDecimalAmounts(rest);
+  if (amountStrings.length === 0) return;
 
-  const movement = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[amounts.length - 1];
-  let amount = parseStatementAmount(movement[0]);
-  if (amount === null || amount === 0) return;
-
-  const description = rest.slice(0, movement.index).trim().replace(/[-|]\s*$/, "");
+  DECIMAL_AMOUNT_RE.lastIndex = 0;
+  const amountMatches = [...rest.matchAll(DECIMAL_AMOUNT_RE)];
+  const firstAmountIndex = amountMatches[0]?.index ?? rest.length;
+  const description = rest.slice(0, firstAmountIndex).trim().replace(/[-|]\s*$/, "");
   if (description.length < 2 || shouldSkipLine(description)) return;
 
-  amount = signedAmountFromDescription(description, amount);
-  appendTx(rows, seen, { date, description, amount }, true);
+  const amount = amountFromDebitCreditColumns(amountStrings, description);
+  if (amount === null || amount === 0) return;
+
+  let balance: number | undefined;
+  if (amountStrings.length >= 2) {
+    const balanceVal = parseStatementAmount(amountStrings[amountStrings.length - 1]!);
+    if (balanceVal !== null) balance = balanceVal;
+  }
+
+  appendTx(rows, seen, { date, description, amount, balance }, true);
 }
 
 export function parseWestpacTransactionAccountLines(
@@ -140,8 +206,12 @@ export function parseWestpacTransactionAccountLines(
     if (!line) continue;
 
     if (WESTPAC_DC_DATE_START_RE.test(line)) {
-      flush();
-      buffer = line;
+      if (buffer !== null && !bufferHasAmounts(buffer)) {
+        buffer = `${buffer} ${line}`;
+      } else {
+        flush();
+        buffer = line;
+      }
     } else if (buffer !== null) {
       if (shouldSkipLine(line)) {
         flush();
@@ -197,8 +267,8 @@ export function detectStatementFormat(
   text: string,
   filename: string,
 ): StatementFormat {
-  if (isWestpacCreditCard(text, filename)) return "westpac_credit_card";
   if (isWestpacTransactionAccount(text, filename)) return "westpac_transaction";
+  if (isWestpacCreditCard(text, filename)) return "westpac_credit_card";
   return "generic";
 }
 
@@ -232,7 +302,8 @@ export function parseStatementText(
   const format =
     options?.format ?? detectStatementFormat(text, filename);
   const accountName =
-    options?.accountName?.trim() || inferAccountName(filename, text);
+    options?.accountName?.trim() ||
+    inferAccountName(filename, text, format);
   const reconKind = reconciliationKindForFormat(format);
 
   let transactions: DraftTransaction[] = [];

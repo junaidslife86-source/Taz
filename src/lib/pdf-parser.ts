@@ -1,7 +1,10 @@
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { DraftTransaction } from "../types/finance";
-import { parseStatementText } from "./statement-formats/westpac";
+import {
+  detectStatementFormat,
+  parseStatementText,
+} from "./statement-formats/westpac";
 import type { StatementFormat, StatementProfile } from "../types/finance";
 import { findMatchingProfile } from "./statement-profiles";
 import type {
@@ -149,24 +152,40 @@ export async function parsePdf(
 
   const rawText = allLines.join("\n");
   assertTextLength(rawText.length);
-  const initial = parseStatementText(rawText, file.name);
+  const detectedFormat = detectStatementFormat(rawText, file.name);
+  let parsed = parseStatementText(rawText, file.name);
 
   const match =
     options?.profiles?.length &&
     findMatchingProfile(file.name, rawText, options.profiles);
 
   if (match) {
-    const learned = parseStatementText(rawText, file.name, {
-      format: match.profile.statementFormat,
+    const profileFormat = match.profile.statementFormat;
+    const formatMatchesDetection =
+      profileFormat === detectedFormat || detectedFormat === "generic";
+
+    if (formatMatchesDetection) {
+      parsed = parseStatementText(rawText, file.name, {
+        format: profileFormat,
+        accountName: match.profile.accountName,
+      });
+      return buildPdfResult(file.name, rawText, parsed, {
+        matchedProfileId: match.profile.id,
+        usedLearnedProfile: true,
+      });
+    }
+
+    parsed = parseStatementText(rawText, file.name, {
+      format: detectedFormat,
       accountName: match.profile.accountName,
     });
-    return buildPdfResult(file.name, rawText, learned, {
+    return buildPdfResult(file.name, rawText, parsed, {
       matchedProfileId: match.profile.id,
-      usedLearnedProfile: true,
+      usedLearnedProfile: false,
     });
   }
 
-  return buildPdfResult(file.name, rawText, initial);
+  return buildPdfResult(file.name, rawText, parsed);
 }
 
 export { parseStatementText } from "./statement-formats/westpac";

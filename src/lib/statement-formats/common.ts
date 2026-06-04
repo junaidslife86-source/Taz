@@ -1,4 +1,5 @@
 import { format, isValid, parse } from "date-fns";
+import type { StatementFormat } from "../../types/finance";
 
 export const DATE_RE =
   /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})/;
@@ -30,19 +31,36 @@ const MONTH_PARSE_FORMATS = [
   "d MMM yyyy",
   "d MMMM yy",
   "d MMMM yyyy",
-  "dd/MM/yyyy",
   "dd/MM/yy",
-  "d/M/yyyy",
+  "dd/MM/yyyy",
   "d/M/yy",
+  "d/M/yyyy",
   "yyyy-MM-dd",
 ];
 
 const SUSPICIOUS_BALANCE_THRESHOLD = 25_000;
 const MAX_PLAUSIBLE_TXN = 50_000;
 
+function parseSlashDate(trimmed: string): string | null {
+  const slash = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!slash) return null;
+
+  const fmt = slash[3]!.length === 2 ? "dd/MM/yy" : "dd/MM/yyyy";
+  try {
+    const d = parse(trimmed, fmt, new Date());
+    if (isValid(d)) return format(d, "yyyy-MM-dd");
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function normalizeDate(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+
+  const slashIso = parseSlashDate(trimmed);
+  if (slashIso) return slashIso;
 
   for (const fmt of MONTH_PARSE_FORMATS) {
     try {
@@ -54,7 +72,18 @@ export function normalizeDate(raw: string): string | null {
   }
 
   const normalized = trimmed.replace(/\//g, "-");
-  for (const fmt of ["dd-MM-yyyy", "dd-MM-yy", "yyyy-MM-dd"]) {
+  const dashParts = normalized.match(/^(\d{1,2})-(\d{1,2})-(\d{2}|\d{4})$/);
+  if (dashParts) {
+    const fmt = dashParts[3]!.length === 2 ? "dd-MM-yy" : "dd-MM-yyyy";
+    try {
+      const d = parse(normalized, fmt, new Date());
+      if (isValid(d)) return format(d, "yyyy-MM-dd");
+    } catch {
+      // fall through
+    }
+  }
+
+  for (const fmt of ["yyyy-MM-dd"]) {
     try {
       const d = parse(normalized, fmt, new Date());
       if (isValid(d)) return format(d, "yyyy-MM-dd");
@@ -175,9 +204,23 @@ export function pickLineAmount(
   return signedAmountFromDescription(description, txnAmount);
 }
 
-export function inferAccountName(filename: string, statementText = ""): string {
+export function inferAccountName(
+  filename: string,
+  statementText = "",
+  format?: StatementFormat,
+): string {
   const pathLower = filename.replace(/\\/g, "/").toLowerCase();
   const text = statementText.toLowerCase().slice(0, 5000);
+
+  if (
+    format === "westpac_transaction" ||
+    pathLower.startsWith("dc_") ||
+    text.includes("westpac choice") ||
+    (text.includes("transaction description") && text.includes("debit"))
+  ) {
+    if (pathLower.includes("joint")) return "Westpac Joint";
+    return "Westpac Choice";
+  }
 
   if (pathLower.includes("cc_") || pathLower.includes("credit card")) {
     if (text.includes("altitude") || text.includes("qantas")) {
@@ -186,9 +229,6 @@ export function inferAccountName(filename: string, statementText = ""): string {
     return "Westpac Credit Card";
   }
   if (pathLower.includes("joint")) return "Westpac Joint";
-  if (pathLower.startsWith("dc_") || text.includes("westpac choice")) {
-    return "Westpac Choice";
-  }
   if (text.includes("westpac")) return "Westpac";
   return "";
 }
