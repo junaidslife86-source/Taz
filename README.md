@@ -138,4 +138,4 @@ MyFinancePal is a personal finance tracking tool, not financial advice. PDF impo
 
 ## License
 
-Private / personal use. See repository for license details.
+AGPL-3.0 — see [LICENSE](LICENSE) in this repository.
