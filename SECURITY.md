@@ -8,13 +8,13 @@
 
 ## Reporting a vulnerability
 
-MyFinancePal is a client-side application. Security issues may affect all users of the hosted build or the import/backup flows.
+Taz is a client-side application. Security issues may affect all users of the hosted build or the import/backup flows.
 
 **Please do not** open public GitHub issues for undisclosed vulnerabilities.
 
 Instead:
 
-1. Open a [GitHub Security Advisory](https://github.com/junaidslife86-source/myfinancepal/security/advisories/new) (preferred), or
+1. Open a [GitHub Security Advisory](https://github.com/junaidslife86-source/Taz/security/advisories/new) (preferred), or
 2. Contact the maintainer via GitHub with a private description of the issue.
 
 Include steps to reproduce, impact, and any suggested fix if you have one.
